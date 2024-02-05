@@ -1,0 +1,10 @@
+  upstream myrabbit {
+      {{- range service "rabbitmq" }}
+      server {{ .Address }}:{{ .Port }};
+      {{- end }}
+   }
+
+   server {
+      listen 5672; # the port to listen on this server
+      proxy_pass myrabbit; # forward traffic to this upstream group
+   }

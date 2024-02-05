@@ -1,0 +1,241 @@
+version: '3'
+
+# YAML Anchor to not write the same code over and over again
+x-minio-common: &minio-common
+  image: minio/minio
+  expose:
+    - "9000"
+    - "9001"
+  environment:
+    - MINIO_ROOT_USER=${MINIO_USER} 
+    - MINIO_ROOT_PASSWORD=${MINIO_PASS} 
+  networks:
+    - nginx_minio_network  
+  command: server --console-address ":9001" http://minio-node{1...4}/data
+
+services:
+  # Node-red container with configurations and env variables to connect to other services
+  nodered:
+    image: berserkermirio/swarm-environment:nodered #my image from repo
+    hostname: mynodered
+    environment:
+      - MINIO_USER=${MINIO_USER} #to connect to minio
+      - MINIO_PASS=${MINIO_PASS} #to connect to minio
+      - LB_HOSTNAME=${LB_HOSTNAME} #to connect to minio
+      - MINIO_PORT=9000 # port to connect to minio
+    ports:
+      - 1880:1880
+    volumes:
+      - nodered_data:/data
+    networks:
+      - nr_nginx_network  
+
+  # Minio cluster, non scaleable
+  minio-node1:
+    <<: *minio-common
+    hostname: minio-node1
+    volumes:
+      - minio1_data:/data
+  minio-node2:
+    <<: *minio-common
+    hostname: minio-node2
+    volumes:
+      - minio2_data:/data
+  minio-node3:
+    <<: *minio-common
+    hostname: minio-node3
+    volumes:
+      - minio3_data:/data
+  minio-node4:
+    <<: *minio-common
+    hostname: minio-node4
+    volumes:
+      - minio4_data:/data
+
+  # Hadoop filesystem simulation and Jupyterlab IDE. 
+  # Used for data analysis and big data or can be changed to just do anything in python.
+  jupyterlab:
+    image: berserkermirio/swarm-environment:jupyterlab #my image from repo
+    hostname: jupyterlab
+    environment: #environment variables with credentials,hostnames ports used to connect to the servers
+      - LB_HOSTNAME=${LB_HOSTNAME}
+      - MINIO_ROOT_USER=${MINIO_USER} 
+      - MINIO_ROOT_PASSWORD=${MINIO_PASS}
+      - MINIO_PORT=9000
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_MANAGEMENT_PORT=15672
+    ports:
+      - 8888:8888
+    volumes:
+      - hadoop_filesystem:/opt/workspace
+    networks:
+      - nginx_jupyterlab_network
+      - jupyterlab_spark_network  
+
+  # Spark cluster with 1 master and 2 workers.Workers are scaleable only up
+  spark-master:
+    image: berserkermirio/swarm-environment:spark #my image from repo
+    ports:
+      - 8080:8080
+      - 7077:7077
+    volumes:
+      - hadoop_filesystem:/opt/workspace
+    networks:
+      - jupyterlab_spark_network  
+    command: bin/spark-class org.apache.spark.deploy.master.Master  
+
+  spark-worker:
+    image: berserkermirio/swarm-environment:spark #my image from repo
+    hostname: spark-worker-{{.Task.Slot}}
+    environment:
+      - SPARK_WORKER_CORES: ${SPARK_WORKER_CORES}
+      - SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY}
+    volumes:
+      - hadoop_filesystem:/opt/workspace
+    depends_on:
+      - spark-master
+    deploy:
+      mode: replicated
+      replicas: 2
+    networks:
+      - jupyterlab_spark_network    
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077         
+
+  # Consul service discovery for rabbitmq replicas to become a cluster.Rabbitmq cluster scaleable
+  consul:
+    image: hashicorp/consul:latest
+    hostname: consul
+    ports:
+      - 8500:8500
+    networks:
+      - rabbimq_consul_network
+      - consul_consul-template_network  
+
+  # Consul-template is used to change the nginx configuration and then reload it when rabbitmq cluster changes
+  consul-template:
+    image: hashicorp/consul-template
+    hostname: consul-template
+    volumes:
+      - nginx_data:/data/nginx_config
+    networks:
+      - consul_consul-template_network 
+      - nginx_consul-template_network  
+    command: consul-template -config /data/consul-template-config.hcl
+
+# Rabbitmq servive.Defaults to cluster with 3 replicas     
+  rabbit:
+      image: berserkermirio/swarm-environment:rabbitmq #my image from repo
+      hostname: rabbit-{{.Task.Slot}}
+      expose: 
+        - 15672
+        - 5672
+      environment: # rabbitmq credentials
+        - RABBITMQ_ERLANG_COOKIE=${RABBITMQ_ERLANG_COOKIE}
+        - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+        - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+      deploy:
+        mode: replicated
+        replicas: 3
+      volumes:
+        - rabbitmq_data:/var/lib/rabbitmq/mnesia 
+      networks:
+        - rabbimq_consul_network
+        - nginx_rabbitmq_network   
+# Load balancer nginx
+  nginx:
+    image: berserkermirio/swarm-environment:nginx #my image from repo
+    hostname: ${LB_HOSTNAME}
+    ports:
+    - 80:80
+    - 15672:15672
+    - 5672:5672
+    - 9000:9000
+    - 9001:9001
+    volumes:
+      - nginx_data:/etc/nginx
+    depends_on:
+      - rabbit
+    networks:
+      - nr_nginx_network
+      - nginx_minio_network
+      - nginx_jupyterlab_network
+      - nginx_rabbitmq_network
+      - nginx_consul-template_network
+
+# networks so the services are isolated and communicate only with the services they should be communicating
+networks:
+  nr_nginx_network:
+    driver: overlay
+  nginx_minio_network:
+    driver: overlay
+  nginx_rabbitmq_network:
+    driver: overlay
+  nginx_consul-template_network:
+    driver: overlay      # I dont think this network is needed 
+  nginx_jupyterlab_network:
+    driver: overlay
+  jupyterlab_spark_network:
+    driver: overlay
+  rabbimq_consul_network:
+    driver: overlay
+  consul_consul-template_network:
+    driver: overlay
+     
+# volumes that are stored in the nfs server
+
+volumes:
+  nodered_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: nfsvers=4,addr=x.x.x.x,rw # addr is the ip address of the nfs server you want to connect
+      device: ":/path/to/dir/in/nfs/server" # path of the folder at the nfs server 
+  minio1_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: nfsvers=4,addr=x.x.x.x,rw # addr is the ip address of the nfs server you want to connect
+      device: ":/path/to/dir/in/nfs/server" # path of the folder at the nfs server 
+  minio2_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: nfsvers=4,addr=x.x.x.x,rw # addr is the ip address of the nfs server you want to connect
+      device: ":/path/to/dir/in/nfs/server" # path of the folder at the nfs server 
+
+  minio3_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: nfsvers=4,addr=x.x.x.x,rw # addr is the ip address of the nfs server you want to connect
+      device: ":/path/to/dir/in/nfs/server" # path of the folder at the nfs server      
+
+  minio4_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: nfsvers=4,addr=x.x.x.x,rw # addr is the ip address of the nfs server you want to connect
+      device: ":/path/to/dir/in/nfs/server" # path of the folder at the nfs server 
+
+  rabbitmq_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: nfsvers=4,addr=x.x.x.x,rw # addr is the ip address of the nfs server you want to connect
+      device: ":/path/to/dir/in/nfs/server" # path of the folder at the nfs server      
+
+  nginx_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: nfsvers=4,addr=x.x.x.x,rw # addr is the ip address of the nfs server you want to connect
+      device: ":/path/to/dir/in/nfs/server" # path of the folder at the nfs server 
+
+  hadoop_filesystem:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: nfsvers=4,addr=x.x.x.x,rw # addr is the ip address of the nfs server you want to connect
+      device: ":/path/to/dir/in/nfs/server" # path of the folder at the nfs server                                        
