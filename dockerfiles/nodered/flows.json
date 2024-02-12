@@ -1,0 +1,830 @@
+[
+    {
+        "id": "5fc1443e5005559e",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "f55a39a420748e9f",
+        "type": "amqp-broker",
+        "name": "",
+        "host": "nginx",
+        "port": "5672",
+        "vhost": "",
+        "tls": false,
+        "credsFromSettings": false
+    },
+    {
+        "id": "0eeda2ec037566fd",
+        "type": "minio-config",
+        "name": "MinIO Instance",
+        "host": "nginx",
+        "port": "9000",
+        "useSsl": false
+    },
+    {
+        "id": "b820d1af95c5e4c7",
+        "type": "inject",
+        "z": "5fc1443e5005559e",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 340,
+        "y": 80,
+        "wires": [
+            [
+                "23af7ced614dc793"
+            ]
+        ]
+    },
+    {
+        "id": "ba9e2704c3971a86",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 35",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 700,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "23af7ced614dc793",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "Date Initialization",
+        "func": "const timestamp = Date.now();\nconst dateObj = new Date(timestamp);\n\nconst year = dateObj.getFullYear();\nconst month = (dateObj.getMonth() + 1).toString().padStart(2, '0'); // Month is zero-based\nconst day = dateObj.getDate().toString().padStart(2, '0');\n\nconst readableDateTime = `${year}-${month}-${day}`;\nconsole.log(readableDateTime); // Output: 2024-02-07\nglobal.set('today','1971-02-02');\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 530,
+        "y": 80,
+        "wires": [
+            [
+                "ba9e2704c3971a86"
+            ]
+        ]
+    },
+    {
+        "id": "5f09be436f132fc2",
+        "type": "comment",
+        "z": "5fc1443e5005559e",
+        "name": "initialize date global env",
+        "info": "",
+        "x": 520,
+        "y": 20,
+        "wires": []
+    },
+    {
+        "id": "2937927e06a7ec81",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "check date",
+        "func": "\nconst timestamp = Date.now();\nconst dateObj = new Date(timestamp);\n\nconst year = dateObj.getFullYear();\nconst month = (dateObj.getMonth() + 1).toString().padStart(2, '0'); // Month is zero-based\nconst day = dateObj.getDate().toString().padStart(2, '0');\n\nconst today = `${year}-${month}-${day}`;\n//console.log(readableDateTime); // Output: 2024-02-07\n\nif(global.get('today')==today){\n    console.log('same date')\n    msg.payload='Still same day';\n    return [msg, null];\n}else{\n\n    global.set('yesterday',global.get('today'));\n    global.set('today',today);\n    msg.payload='day changed';\n    console.log('differemt date');\n    return [null,msg];\n\n}    \n",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 240,
+        "wires": [
+            [
+                "897ef4fbc12f4a4b"
+            ],
+            [
+                "82f91ace47b49ede"
+            ]
+        ]
+    },
+    {
+        "id": "9665b55101abafdc",
+        "type": "inject",
+        "z": "5fc1443e5005559e",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 180,
+        "y": 240,
+        "wires": [
+            [
+                "2937927e06a7ec81"
+            ]
+        ]
+    },
+    {
+        "id": "897ef4fbc12f4a4b",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "API CALL TO GET DATA",
+        "func": "msg.url='https://api.open-meteo.com/v1/forecast?latitude=37.9838&longitude=23.7278&current=temperature_2m,relative_humidity_2m&hourly=temperature_2m';\nmsg.method='GET';\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 750,
+        "y": 220,
+        "wires": [
+            [
+                "c97702b226071b17"
+            ]
+        ]
+    },
+    {
+        "id": "3418816b27f49b6d",
+        "type": "comment",
+        "z": "5fc1443e5005559e",
+        "name": "check day",
+        "info": "",
+        "x": 420,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "1963b628a3a6e6d7",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 37",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1220,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "c97702b226071b17",
+        "type": "http request",
+        "z": "5fc1443e5005559e",
+        "name": "",
+        "method": "use",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 1010,
+        "y": 220,
+        "wires": [
+            [
+                "1963b628a3a6e6d7",
+                "d846c433c6d3dd2e"
+            ]
+        ]
+    },
+    {
+        "id": "d846c433c6d3dd2e",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "filter current data",
+        "func": "var data = msg.payload;\n\nvar temp = data.current.temperature_2m;\nvar hum = data.current.relative_humidity_2m;\nmsg.payload={};\nmsg.payload.temp = temp;\nmsg.payload.hum = hum;\nmsg.filename='/data/'+global.get('today')+'.csv';\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1030,
+        "y": 280,
+        "wires": [
+            [
+                "ffa6b1b94ab1f1b5",
+                "dd789a66bf82978a"
+            ]
+        ]
+    },
+    {
+        "id": "ffa6b1b94ab1f1b5",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 38",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1240,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "617f44378ff022dc",
+        "type": "file",
+        "z": "5fc1443e5005559e",
+        "name": "",
+        "filename": "filename",
+        "filenameType": "msg",
+        "appendNewline": false,
+        "createDir": false,
+        "overwriteFile": "false",
+        "encoding": "none",
+        "x": 1020,
+        "y": 400,
+        "wires": [
+            [
+                "638242d378743917",
+                "292e7cab568cdf58"
+            ]
+        ]
+    },
+    {
+        "id": "638242d378743917",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 40",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1240,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "52a4298dfd9e0d8c",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 41",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1220,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "dd789a66bf82978a",
+        "type": "csv",
+        "z": "5fc1443e5005559e",
+        "name": "",
+        "sep": ",",
+        "hdrin": false,
+        "hdrout": "none",
+        "multi": "one",
+        "ret": "\\n",
+        "temp": "",
+        "skip": "0",
+        "strings": true,
+        "include_empty_strings": "",
+        "include_null_values": "",
+        "x": 1010,
+        "y": 340,
+        "wires": [
+            [
+                "52a4298dfd9e0d8c",
+                "617f44378ff022dc"
+            ]
+        ]
+    },
+    {
+        "id": "94fe4d08710e6617",
+        "type": "comment",
+        "z": "5fc1443e5005559e",
+        "name": "store data in 'todays-date'.csv file",
+        "info": "",
+        "x": 1070,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "d4021935fe1575ba",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "Get notebook",
+        "func": "var jupyter = msg.payload;\n\nfor (var i=0;i<=jupyter.content.cells.length;i++)\n{\n    var cells = jupyter.content.cells[i].source;\n    msg={};\n    msg.payload = cells;\n    node.send(msg);\n}\n\n\n//return msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 620,
+        "wires": [
+            [
+                "3647e6d482e8d3a9",
+                "0fba8a00d517b2e7"
+            ]
+        ]
+    },
+    {
+        "id": "4bc345af46761c66",
+        "type": "http request",
+        "z": "5fc1443e5005559e",
+        "name": "",
+        "method": "use",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 370,
+        "y": 540,
+        "wires": [
+            [
+                "d4021935fe1575ba"
+            ]
+        ]
+    },
+    {
+        "id": "3647e6d482e8d3a9",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "prepare message",
+        "func": "var code=msg.payload;\nmsg={};\n\nvar msg_type = \"execute_request\";\nvar content = {\"code\":code , \"silent\": false};\nvar hdr = {\n    \"msg_id\":\"1\",\n    \"username\": \"\",\n    \"session\": \"1\",\n    \"data\": Date.now(),\n    \"msg_type\": msg_type,\n    \"version\": \"5.0\",\n    };\nmsg.payload = {\"header\": hdr, \"parent_header\": hdr, \"metadata\": {}, \"content\": content};\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 350,
+        "y": 680,
+        "wires": [
+            [
+                "d43eb58b5329f0ca",
+                "074d59ec001846aa"
+            ]
+        ]
+    },
+    {
+        "id": "538018982309f530",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "API call to get notebook",
+        "func": "\nvar id = msg.payload.id;\nmsg={};\nmsg.id = id;\nmsg.url='http://d482bb3aeb56:8888/api/contents/test.ipynb';\nmsg.method='GET';\nglobal.set(\"kernel_id\",id);\nreturn msg;\n   \n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 350,
+        "y": 460,
+        "wires": [
+            [
+                "d4633c93e8f49113",
+                "4bc345af46761c66"
+            ]
+        ]
+    },
+    {
+        "id": "d43eb58b5329f0ca",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "Websocket connection",
+        "func": "const WebSocket = context.global.ws;\nvar id = global.get('kernel_id');\n// WebSocket server URL\nconst wsServerUrl = 'ws://d482bb3aeb56:8888/api/kernels/'+id+'/channels'; \nmsg.payload.url = wsServerUrl;\n// Create a WebSocket instance\nconst ws = new WebSocket(wsServerUrl);\n\n// WebSocket event handlers\nws.on('open', function open() {\n    console.log('WebSocket connection established.');\n    // Send a message once the connection is open\n    const serializedData = JSON.stringify(msg.payload);\n    ws.send(serializedData);\n    ws.close();\n    console.log('closed');\n});\n\n//ws.on('message', function incoming(serializedData) {\n//    console.log('Received message from server:', serializedData);\n//});\n\nws.on('close', function close() {\n    console.log('WebSocket connection closed.');\n    \n\n});\n\nws.on('error', function error(err) {\n    console.error('WebSocket error:', err);\n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 740,
+        "wires": [
+            [
+                "b4c2176acbfb6b38"
+            ]
+        ]
+    },
+    {
+        "id": "b4c2176acbfb6b38",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 42",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 560,
+        "y": 740,
+        "wires": []
+    },
+    {
+        "id": "d4633c93e8f49113",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 43",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "0fba8a00d517b2e7",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 44",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 540,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "074d59ec001846aa",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 45",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 560,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "07b4d9cd4c5bbc5a",
+        "type": "http request",
+        "z": "5fc1443e5005559e",
+        "name": "",
+        "method": "use",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 410,
+        "y": 380,
+        "wires": [
+            [
+                "538018982309f530",
+                "deb8405b1f07b88f"
+            ]
+        ]
+    },
+    {
+        "id": "82f91ace47b49ede",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "Start kernel",
+        "func": "msg={};\nmsg.payload = { \"name\": \"python3\"};\nmsg.url='http://d482bb3aeb56:8888/api/kernels';\nmsg.method='POST';\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 300,
+        "wires": [
+            [
+                "07b4d9cd4c5bbc5a",
+                "af6b4f5280937db5"
+            ]
+        ]
+    },
+    {
+        "id": "deb8405b1f07b88f",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 46",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "af6b4f5280937db5",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 47",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 620,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "3ddc0b1dd8904aba",
+        "type": "comment",
+        "z": "5fc1443e5005559e",
+        "name": "Analyze Data",
+        "info": "",
+        "x": 170,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "44759cf4723f67af",
+        "type": "amqp-in",
+        "z": "5fc1443e5005559e",
+        "name": "",
+        "broker": "f55a39a420748e9f",
+        "prefetch": "1",
+        "noAck": true,
+        "exchangeName": "test.fanout",
+        "exchangeType": "fanout",
+        "exchangeRoutingKey": "",
+        "exchangeDurable": true,
+        "queueName": "test.queue",
+        "queueExclusive": false,
+        "queueDurable": true,
+        "queueAutoDelete": true,
+        "headers": "{}",
+        "x": 840,
+        "y": 680,
+        "wires": [
+            [
+                "d4df01d6b9ac9a21",
+                "600fe6887197166c"
+            ]
+        ]
+    },
+    {
+        "id": "d4df01d6b9ac9a21",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 48",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1200,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "b0e3bfb221db87ed",
+        "type": "comment",
+        "z": "5fc1443e5005559e",
+        "name": "Metadata from message",
+        "info": "",
+        "x": 930,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "e7891ab3eeb9dad0",
+        "type": "http request",
+        "z": "5fc1443e5005559e",
+        "name": "",
+        "method": "use",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 990,
+        "y": 880,
+        "wires": [
+            [
+                "8bdc09670201fe0f"
+            ]
+        ]
+    },
+    {
+        "id": "8bdc09670201fe0f",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 49",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1200,
+        "y": 880,
+        "wires": []
+    },
+    {
+        "id": "6d99247d7dbf9903",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "Remove kernel",
+        "func": "var id = global.get('kernel_id');\nmsg.url='http://d482bb3aeb56:8888/api/kernels/'+id;\nmsg.method='DELETE';\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1000,
+        "y": 840,
+        "wires": [
+            [
+                "e7891ab3eeb9dad0"
+            ]
+        ]
+    },
+    {
+        "id": "6243f72dacaa534f",
+        "type": "files",
+        "z": "5fc1443e5005559e",
+        "files_name": "",
+        "host": "0eeda2ec037566fd",
+        "files_operation": "fPutObject",
+        "files_bucket": "",
+        "files_object": "",
+        "files_filepath": "",
+        "files_metadata": "",
+        "x": 1020,
+        "y": 500,
+        "wires": [
+            [],
+            []
+        ]
+    },
+    {
+        "id": "77687a9c98336412",
+        "type": "files",
+        "z": "5fc1443e5005559e",
+        "files_name": "",
+        "host": "0eeda2ec037566fd",
+        "files_operation": "fPutObject",
+        "files_bucket": "",
+        "files_object": "",
+        "files_filepath": "",
+        "files_metadata": "",
+        "x": 1020,
+        "y": 780,
+        "wires": [
+            [
+                "6d99247d7dbf9903"
+            ],
+            [
+                "6d99247d7dbf9903"
+            ]
+        ]
+    },
+    {
+        "id": "600fe6887197166c",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "Add average for todays data",
+        "func": "\n\nmsg.metaData=msg.payload;\nmsg.bucketName='data';\nmsg.objectName=global.get('yesterday')+'.csv'\nmsg.filepath='/data/'+global.get('yesterday')+'.csv';\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1020,
+        "y": 720,
+        "wires": [
+            [
+                "0c588d7d63064d5d",
+                "6d99247d7dbf9903"
+            ]
+        ]
+    },
+    {
+        "id": "0c588d7d63064d5d",
+        "type": "debug",
+        "z": "5fc1443e5005559e",
+        "name": "debug 50",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1260,
+        "y": 740,
+        "wires": []
+    },
+    {
+        "id": "292e7cab568cdf58",
+        "type": "function",
+        "z": "5fc1443e5005559e",
+        "name": "Add average for todays data",
+        "func": "\n\nmsg.metaData=msg.payload;\nmsg.bucketName='data';\nmsg.objectName=global.get('yesterday')+'.csv'\nmsg.filepath='/data/'+global.get('yesterday')+'.csv';\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1020,
+        "y": 460,
+        "wires": [
+            [
+                "6243f72dacaa534f"
+            ]
+        ]
+    }
+]

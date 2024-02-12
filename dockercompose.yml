@@ -3,9 +3,6 @@ version: '3'
 # YAML Anchor to not write the same code over and over again
 x-minio-common: &minio-common
   image: minio/minio
-  expose:
-    - "9000"
-    - "9001"
   environment:
     - MINIO_ROOT_USER=${MINIO_USER} 
     - MINIO_ROOT_PASSWORD=${MINIO_PASS} 
@@ -16,13 +13,18 @@ x-minio-common: &minio-common
 services:
   # Node-red container with configurations and env variables to connect to other services
   nodered:
-    image: berserkermirio/swarm-environment:nodered #my image from repo
+    image: berserkermirio/swarm-nodered #my image from repo
     hostname: mynodered
     environment:
       - MINIO_USER=${MINIO_USER} #to connect to minio
       - MINIO_PASS=${MINIO_PASS} #to connect to minio
       - LB_HOSTNAME=${LB_HOSTNAME} #to connect to minio
       - MINIO_PORT=9000 # port to connect to minio
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASS=${RABBITMQ_PASS}
+      - RABBITMQ_AMQP_PORT=5672
+      - RABBITMQ_MANAGEMENT_PORT=15672
+      - JUPYTERLAB_PORT=8888
     ports:
       - 1880:1880
     volumes:
@@ -55,16 +57,16 @@ services:
   # Hadoop filesystem simulation and Jupyterlab IDE. 
   # Used for data analysis and big data or can be changed to just do anything in python.
   jupyterlab:
-    image: berserkermirio/swarm-environment:jupyterlab #my image from repo
+    image: berserkermirio/swarm-jupyterlab #my image from repo
     hostname: jupyterlab
     environment: #environment variables with credentials,hostnames ports used to connect to the servers
       - LB_HOSTNAME=${LB_HOSTNAME}
       - MINIO_ROOT_USER=${MINIO_USER} 
       - MINIO_ROOT_PASSWORD=${MINIO_PASS}
       - MINIO_PORT=9000
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
-      - RABBITMQ_PORT=5672
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+      - RABBITMQ_AMQP_PORT=5672
       - RABBITMQ_MANAGEMENT_PORT=15672
     ports:
       - 8888:8888
@@ -76,7 +78,8 @@ services:
 
   # Spark cluster with 1 master and 2 workers.Workers are scaleable only up
   spark-master:
-    image: berserkermirio/swarm-environment:spark #my image from repo
+    image: berserkermirio/swarm-spark #my image from repo
+    hostname: spark-master
     ports:
       - 8080:8080
       - 7077:7077
@@ -87,7 +90,7 @@ services:
     command: bin/spark-class org.apache.spark.deploy.master.Master  
 
   spark-worker:
-    image: berserkermirio/swarm-environment:spark #my image from repo
+    image: berserkermirio/swarm-spark #my image from repo
     hostname: spark-worker-{{.Task.Slot}}
     environment:
       - SPARK_WORKER_CORES: ${SPARK_WORKER_CORES}
@@ -115,7 +118,7 @@ services:
 
   # Consul-template is used to change the nginx configuration and then reload it when rabbitmq cluster changes
   consul-template:
-    image: hashicorp/consul-template
+    image: berserkermirio/swarm-template
     hostname: consul-template
     volumes:
       - nginx_data:/data/nginx_config
@@ -126,17 +129,19 @@ services:
 
 # Rabbitmq servive.Defaults to cluster with 3 replicas     
   rabbit:
-      image: berserkermirio/swarm-environment:rabbitmq #my image from repo
+      image: berserkermirio/swarm-rabbitmq #my image from repo
       hostname: rabbit-{{.Task.Slot}}
       expose: 
         - 15672
         - 5672
       environment: # rabbitmq credentials
         - RABBITMQ_ERLANG_COOKIE=${RABBITMQ_ERLANG_COOKIE}
-        - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
-        - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+        - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+        - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
       deploy:
-        mode: replicated
+        placement:
+          constraints:
+            - node.role == master
         replicas: 3
       volumes:
         - rabbitmq_data:/var/lib/rabbitmq/mnesia 
@@ -145,7 +150,7 @@ services:
         - nginx_rabbitmq_network   
 # Load balancer nginx
   nginx:
-    image: berserkermirio/swarm-environment:nginx #my image from repo
+    image: berserkermirio/swarm-nginx #my image from repo
     hostname: ${LB_HOSTNAME}
     ports:
     - 80:80
@@ -157,6 +162,11 @@ services:
       - nginx_data:/etc/nginx
     depends_on:
       - rabbit
+      - minio-node1
+      - minio-node2
+      - minio-node3
+      - minio-node4
+      - jupyterlab
     networks:
       - nr_nginx_network
       - nginx_minio_network
