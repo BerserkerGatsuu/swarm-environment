@@ -23,6 +23,7 @@ RUN apt-get update -y && \
 RUN pip3 install boto3 && \
     pip3 install pika
 
+COPY jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
 # -- Runtime
 
 EXPOSE 8888

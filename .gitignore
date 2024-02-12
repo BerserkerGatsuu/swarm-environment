@@ -1,0 +1,5 @@
+# Exclude all files with the extension .env
+*.env
+
+# Exclude all files and directories inside a folder named secrets
+secrets/
